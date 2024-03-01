@@ -49,12 +49,15 @@ When the alert is created, the bot will send you a confirmation with the content
 
 <img src="images/5.png" width="300" alt="Step 6 - Alert created">
 
+<img src="images/6.png" width="300" alt="Step 7 - Match Found">
+
+
 #### Match Found notification
 
 The bot will keep checking in the background for new orders matching your requirement.
 Anytime a new match is found, the bot will inform you as follows:
 
-<img src="images/6.png" width="300" alt="Step 7 - Match Found">
+<img src="images/7.png" width="300" alt="Step 7 - Match Found">
 
 Detailed information about the order will be given (order ID, Premium, Payment Method accepted and amound).
 It will also send you the onion link to place the order, and the coordinator name hosting that order.

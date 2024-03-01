@@ -70,7 +70,7 @@ You can manage them by changing their status (from disable to enabled) and vicev
 <img src="images/9.png" width="300" alt="Step 9 - alert management">
 
 Buy default every alert will be created with a lifetime of 7 days.
-After 7 days they will be automatically disabled. At any time you can extend the lifetime of an alert by typing /extend <alert id> <number of days>.
+After 7 days they will be automatically disabled. At any time you can extend the lifetime of an alert by typing /extend (alert id) (number of days).
 In the example below we extend the lifetime of the alert 48, by 60 days from current date:
 
 <img src="images/10.png" width="300" alt="Step 10 - alert management">
@@ -84,7 +84,7 @@ Here's a brief overview of the key components in this project:
 
 ### JavaScript Files
 
-- **`bot.js`**: The core of the chat bot, handling user interactions, processing commands, and managing user sessions. It establishes the WebSocket connection to the Simplex Chat server and listens for incoming messages from the users to respond accordingly.
+- **`bot.js`**: The core of the chat bot, handling user interactions, processing commands, and managing user sessions. It establishes the WebSocket connection to the Simplex Chat server, listens for incoming messages from the users to respond according to `alert.db` alerts and notifications status.
 
 ### Python Scripts
 

@@ -113,6 +113,8 @@ To self-host it, firstly you need to install [SimpleX Chat terminal CLI](https:/
    simplex-chat -p 5225
    ```
 
+You also need tor socks5, listnening at 127.0.0.1:9050. 
+
 ### Installation
 
 First, you need to clone the `simplex-chat` repository. This is necessary to use the dependencies needed by the bot:

@@ -49,7 +49,7 @@ When the alert is created, the bot will send you a confirmation with the content
 
 <img src="images/5.png" width="300" alt="Step 6 - Alert created">
 
-<img src="images/6.png" width="300" alt="Step 7 - Match Found">
+<img src="images/6.png" width="300" alt="Step 7 - Alert confirmation">
 
 
 #### Match Found notification

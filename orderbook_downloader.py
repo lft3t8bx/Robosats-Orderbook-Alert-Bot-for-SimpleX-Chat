@@ -7,7 +7,6 @@ import socks
 import socket
 
 ORDERBOOK_URLS = [
-    'http://robosats6tkf3eva7x2voqso3a5wcorsnw34jveyxfqi2fu7oyheasid.onion/api/book/?format=json',
     'http://ngdk7ocdzmz5kzsysa3om6du7ycj2evxp2f2olfkyq37htx3gllwp2yd.onion/api/book/?format=json',
     'http://satstraoq35jffvkgpfoqld32nzw2siuvowanruindbfojowpwsjdgad.onion/api/book/?format=json',
     'http://4t4jxmivv6uqej6xzx2jx3fxh75gtt65v3szjoqmc4ugdlhipzdat6yd.onion/api/book/?format=json',
@@ -15,8 +14,9 @@ ORDERBOOK_URLS = [
 ]
 
 ORDERBOOK_DIR = 'data/orderbook'
-DOWNLOAD_INTERVAL = 60  
+DOWNLOAD_INTERVAL = 60  # in seconds
 
+# Configure requests to use Tor SOCKS5 proxy
 session = requests.session()
 session.proxies = {
     'http': 'socks5h://127.0.0.1:9050',
@@ -29,7 +29,7 @@ def download_orderbook(orderbook_url):
     """
     try:
         response = session.get(orderbook_url)
-        response.raise_for_status()  
+        response.raise_for_status()  # Raises a HTTPError if the response status code is 4XX/5XX
         return response.json()
     except requests.RequestException as e:
         print(f"Failed to download order book: {e}")

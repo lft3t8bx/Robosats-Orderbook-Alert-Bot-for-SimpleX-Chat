@@ -72,7 +72,7 @@ You can manage them by changing their status (from disable to enabled) and vicev
 
 <img src="images/9.png" width="300" alt="Step 9 - alert management">
 
-Buy default every alert will be created with a lifetime of 7 days.
+By default every alert will be created with a lifetime of 7 days.
 After 7 days they will be automatically disabled. At any time you can extend the lifetime of an alert by typing /extend (alert id) (number of days).
 In the example below we extend the lifetime of the alert 48, by 60 days from current date:
 
@@ -97,7 +97,7 @@ Here's a brief overview of the key components in this project:
 
 ### Data Files
 
-- **`data/alert.db`**: A SQLite database file that stores user alerts, matches, and notification statuses. It is interacted with by both bot.js and the matcher.py script.
+- **`data/alert.db`**: A SQLite database file that stores user alerts, matches, and notifications status.
 
 - **`data/currency.json`**: Contains mapping of currency codes to currency names, used by the matcher script to validate and process user alerts based on currency preferences.
 
@@ -158,3 +158,9 @@ python3 orderbook_downloader.py
 ```
 
 For the bot to function properly, the SimpleX Chat terminal CLI, bot.js, matcher.py, and orderbook_downloader.py must run simultaneously.
+
+## Easter egg
+
+For the braves that read so far, here is an easter egg:
+type /satoshi to get a random Satoshi Nakamoto quote from [The Quotable Satoshi](https://satoshi.nakamotoinstitute.org/quotes/) .
+

@@ -7,8 +7,10 @@ const schedule = require("node-schedule")
 
 const Bottleneck = require("bottleneck")
 const requestHandlerLimiter = new Bottleneck({
+  // up to x requests
   maxConcurrent: 1000,
 
+  // per y milliseconds
   minTime: 50,
 })
 
@@ -45,7 +47,7 @@ async function run() {
 
   processMessages(chat)
   startNotificationChecker(chat)
-  scheduleAlertCheck(chat) 
+  scheduleAlertCheck(chat) // Correctly placed to schedule the alert check for disabling old alerts
 }
 
 async function startNotificationChecker(chat) {
@@ -79,6 +81,7 @@ async function processMessages(chat) {
     let userId,
       commandRecognized = false
 
+    // Handle new contact connections
     if (response.type === "contactConnected") {
       const {contact} = response
       console.log(`${contact.profile.displayName} connected`)
@@ -87,17 +90,19 @@ async function processMessages(chat) {
         contact.contactId,
         "🤖 *Welcome to the Simplex Robosats alert bot!* 🚀 This bot will notify you 📬 every time an order that matches your requirements is posted on Robosats. To get started, please type `/help` for a list of commands you can use. 🛠️\n\nCreated by 🏛️ TempleOfSats 🏛️"
       )
-      continue 
+      continue // Skip further processing for this iteration
     }
 
+    // Process messages if the type is newChatItem
     if (response.type === "newChatItem") {
       if (response.chatItem.chatInfo.type === ChatInfoType.Direct) {
         userId = response.chatItem.chatInfo.contact.contactId
         const rawContent = response.chatItem.chatItem.content ? ciContentText(response.chatItem.chatItem.content) : null
         const textContent = typeof rawContent === "string" ? rawContent.trim() : ""
 
+        // Skip processing if message is empty
         if (!textContent) {
-          continue 
+          continue // Skip to the next iteration of the loop if the message is empty
         }
 
         console.log(`Message from ${userId}: ${textContent}`)
@@ -107,18 +112,22 @@ async function processMessages(chat) {
           } catch (error) {
             if (error instanceof ChatCommandError) {
               console.error(`Encountered a chat command error: ${error.message}`)
+              // Handle specific error types, e.g., contactNotReady
               if (error.response?.chatError?.errorType?.type === "contactNotReady") {
                 console.log(`Contact not ready for message: ${error.response.chatError.errorType.contact.contactId}`)
-                continue 
+                // Implement any specific logic here, such as retrying later or logging the issue
+                continue // Skip further processing for this iteration
               }
             } else {
-              throw error
+              // Handle other types of errors
+              throw error // Or handle it as appropriate
             }
           }
         }
       }
     }
 
+    // Send "Unrecognized command" message if the command is not recognized
     if (userId && !userSessions[userId] && !commandRecognized) {
       await chat.apiSendTextMessage(
         ChatType.Direct,
@@ -142,6 +151,7 @@ async function handleUserMessage(userId, text, chat) {
     }, 600000)
   }
 
+  // add more commands here
   if (text === "/list") {
     console.log("Listing alerts...")
     await listAlerts(userId, chat)
@@ -184,7 +194,7 @@ async function handleUserMessage(userId, text, chat) {
     getRandomQuote((message) => {
         chat.apiSendTextMessage(ChatType.Direct, userId, message);
     });
-    return true; 
+    return true; // Ensure to return true to stop further processing
   }
 
   if (text === "/help") {
@@ -196,7 +206,7 @@ async function handleUserMessage(userId, text, chat) {
   if (text.startsWith("/remove ")) {
     console.log("Remove alert command detected...");
     const alertId = text.split(" ")[1];
-    if (alertId && !isNaN(alertId)) { 
+    if (alertId && !isNaN(alertId)) { // Make sure alertId is a number
         await removeAlert(userId, alertId, chat);
     } else {
         chat.apiSendTextMessage(ChatType.Direct, userId, "Please provide a valid alert ID.");
@@ -236,6 +246,7 @@ async function handleUserMessage(userId, text, chat) {
       case "currency":
         const normalizedInput = text.trim().toUpperCase(); // Normalize the input
       
+        // Check if the input is "ANY" or a valid currency code
         if (normalizedInput === "ANY" || Object.values(currencyCodes).includes(normalizedInput)) {
           session.currency = normalizedInput; // Store "ANY" or the valid currency code
           session.step = "premium"; // Move to the next step
@@ -245,6 +256,7 @@ async function handleUserMessage(userId, text, chat) {
             "💼 What is the premium you're willing to buy/sell for (as a percentage)? Type the maximum premium if buying, minimum if selling. (e.g., 10)"
           );
         } else {
+          // If the currency is neither "ANY" nor a valid code, ask again
           await chat.apiSendTextMessage(
             ChatType.Direct,
             userId,
@@ -254,6 +266,7 @@ async function handleUserMessage(userId, text, chat) {
       break
       case "premium":
       if (!isNaN(text)) {
+        // Removed the >= 0 condition to allow negative numbers
         session.premium = parseFloat(text)
         session.step = "payment_method"
         await chat.apiSendTextMessage(
@@ -273,23 +286,29 @@ async function handleUserMessage(userId, text, chat) {
         userId,
         "💰 Please specify your minimum and maximum amount by entering it in the following format: `min-max`. For example, `100-500`. If there's no limit, type `ANY` for either min, max or both. This will help us match you with the perfect orders! 📊"
       )
+      // explain the format as you mentioned
       break
     case "amount":
+        // Trim the input to remove leading/trailing spaces
       const trimmedInput = text.trim();
       
+        // Split the input based on the hyphen and trim parts
       const parts = trimmedInput.split('-').map(part => part.trim());
       
+        // Check if parts length is 2 and both parts are either numbers or "ANY"
       const isValidInput = parts.length === 2 && parts.every(part => !isNaN(part) || part.toUpperCase() === "ANY");
       
       if (!isValidInput) {
+          // If input is not valid, prompt the user to use the correct format
         await chat.apiSendTextMessage(
           ChatType.Direct,
           userId,
           "💡 Please ensure you use the correct format with a hyphen between the minimum and maximum amounts, like `100-500` or `ANY-ANY`. Spaces around the hyphen are okay. Try again:"
         );
-        return true;
+        return true; // Return true to indicate a command was recognized but needs correction
         }
       
+        // Proceed with parsing and handling the correctly formatted input
       session.min_amount = parts[0].toUpperCase() === "ANY" ? 0 : parseFloat(parts[0]);
       session.max_amount = parts[1].toUpperCase() === "ANY" ? Infinity : parseFloat(parts[1]);
       
@@ -672,7 +691,7 @@ function retryNotification(chat, userId, message, notificationId, reason) {
   const retryCount = userSessions[userId]?.retryCount || 0
   if (retryCount >= 3) {
     console.error(`Notification failed after maximum retries, not retrying. ${notificationId} to user ${userId}`, reason)
-    markNotificationAsFailed(notificationId) 
+    markNotificationAsFailed(notificationId) // marking notification as failed after max retries
     return
   }
 
@@ -708,34 +727,45 @@ function markNotificationAsSent(notificationId) {
   db.close()
 }
 
-function disableOldAlertsAndNotify() {
+function disableOldAlertsAndNotify(chat) {
   let db = new sqlite3.Database(DATABASE_PATH, sqlite3.OPEN_READWRITE, (err) => {
     if (err) {
       console.error("Error opening database", err.message)
-      return
+      return;
     }
-  })
+  });
 
-  const aWeekAgo = new Date()
-  aWeekAgo.setDate(aWeekAgo.getDate() - 7)
+  const aWeekAgo = new Date();
+  aWeekAgo.setDate(aWeekAgo.getDate() - 7);
 
-  const query = `SELECT * FROM alerts WHERE created_at < ? AND is_active = 1`
+  const query = `SELECT * FROM alerts WHERE created_at < ? AND is_active = 1`;
   db.each(query, [aWeekAgo.toISOString()], (err, row) => {
     if (err) {
-      console.error("Error querying old alerts", err.message)
+      console.error("Error querying old alerts", err.message);
     } else {
       db.run(`UPDATE alerts SET is_active = 0 WHERE alert_id = ?`, [row.alert_id], function (err) {
         if (err) {
-          console.error("Error disabling alert", err.message)
+          console.error("Error disabling alert", err.message);
         } else {
-          const message = `🔔Your alert ${row.alert_id} "${row.message}" has expired🔕. You can re-enable it by sending "/enable ${row.alert_id}" or extend its expiry by sending "/extend ${row.alert_id} <number of days>".This is normal! By default all alerts are disabled after 7 days`
-          chat.apiSendTextMessage(ChatType.Direct, row.user_id, message)
+          const message = `🔔Your alert ${row.alert_id} "${row.message}" has expired🔕. You can re-enable it by sending "/enable ${row.alert_id}" or extend its expiry by sending "/extend ${row.alert_id} <number of days>". This is normal! By default, all alerts are disabled after 7 days.`;
+          // Ensure chat is properly initialized and able to send messages
+          if (chat && chat.apiSendTextMessage) {
+            chat.apiSendTextMessage(ChatType.Direct, row.user_id, message).then(() => {
+              console.log(`Notification sent successfully to user ${row.user_id} for alert ${row.alert_id}.`);
+            }).catch((error) => {
+              console.error(`Failed to send notification to user ${row.user_id} for alert ${row.alert_id}:`, error);
+            });
+          }
         }
-      })
+      });
     }
-  })
+  });
 
-  db.close()
+  db.close((err) => {
+    if (err) {
+      console.error("Error closing database", err);
+    }
+  });
 }
 
 function getRandomQuote(callback) {
@@ -758,6 +788,7 @@ function getRandomQuote(callback) {
 }
 
 function scheduleAlertCheck(chat) {
+  // Schedule to run daily at 5 pm
   schedule.scheduleJob("0 17 * * *", function () {
     console.log("Scheduled check for old alerts...")
     disableOldAlertsAndNotify(chat)

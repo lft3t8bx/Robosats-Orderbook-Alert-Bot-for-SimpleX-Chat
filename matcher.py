@@ -24,16 +24,16 @@ def load_federation_data():
         print(f"Error loading federation data: {e}")
         return {}
 
-def find_coordinator_name(source, federation_data):
+def find_coordinator_name_and_short_alias(source, federation_data):
     source = source.replace("http://", "").replace("https://", "")
-    
+
     for coordinator, data in federation_data.items():
         onion_url = data.get("mainnet", {}).get("onion", "")
         onion_url = onion_url.replace("http://", "").replace("https://", "")
-        
+
         if onion_url == source:
-            return data.get("longAlias", "")
-    return ""
+            return data.get("longAlias", ""), data.get("shortAlias", "")
+    return "", ""
 
 def normalize_payment_method(method):
     method = method.lower().replace(' ', '')
@@ -41,10 +41,10 @@ def normalize_payment_method(method):
 
 def find_matches(alert, order_book, currency_mapping):
     matches = []
-    
+
     for order in order_book:
         currency_code = currency_mapping.get(str(order['currency']), None)
-        
+
         if alert['currency'].upper() != "ANY" and currency_code != alert['currency']:
             print(f"Skipping order {order['id']} due to currency mismatch: Order currency {currency_code}, Alert currency {alert['currency']}")
             continue
@@ -53,15 +53,12 @@ def find_matches(alert, order_book, currency_mapping):
             print(f"Skipping order {order['id']} due to action mismatch. Order action: {order['type']}, Alert action: {alert['action']}")
             continue
 
-        # Check for premium match.
-        # If Alert is SELL, Premium in OrderBook needs to be greater or equal
-        # If Alert is BUY, Premium in OrderBook needs to be lower or equal
         order_premium = float(order['premium'])
         alert_premium = float(alert['premium'])
         if (alert['action'].upper() == 'SELL' and order_premium < alert_premium) or (alert['action'].upper() == 'BUY' and order_premium > alert_premium):
             print(f"Skipping order {order['id']} due to premium mismatch. Order premium: {order_premium}, Alert premium: {alert_premium}")
             continue
-        
+
         alert_payment_methods = [normalize_payment_method(method) for method in alert['payment_method'].split(',')]
         bypass_payment_method_check = 'any' in alert_payment_methods
 
@@ -73,55 +70,52 @@ def find_matches(alert, order_book, currency_mapping):
         if order['has_range']:
             lower_min_amount = str(alert['min_amount']).lower().strip() if alert['min_amount'] is not None else None
             lower_max_amount = str(alert['max_amount']).lower().strip() if alert['max_amount'] is not None else None
-            
+
             min_amount = float(order['min_amount']) if order['min_amount'] else None
             max_amount = float(order['max_amount']) if order['max_amount'] else None
-            
+
             if lower_min_amount == 'any' and lower_max_amount == 'any':
                 pass
             elif min_amount is not None and max_amount is not None:
                 amount_match = not (float(alert['max_amount']) < min_amount or float(alert['min_amount']) > max_amount)
-                print(f"Amount match for range order {order['id']} and alert {alert['alert_id']} is {amount_match}")
                 if not amount_match:
                     continue
         else:
             if alert['min_amount'] is not None and alert['max_amount'] is not None and order.get('amount') is not None:
                 amount_match = float(alert['min_amount']) <= float(order['amount']) <= float(alert['max_amount'])
-                print(f"Amount match for single value order {order['id']} and alert {alert['alert_id']} is {amount_match}")
                 if not amount_match:
                     continue
 
         matches.append(order)
     return matches
 
-   
 def notify_user(user_id, matches, alert, federation_data):
     with sqlite3.connect(DATABASE_PATH) as conn:
         cursor = conn.cursor()
         for match in matches:
-            coordinator_name = find_coordinator_name(match['source'], federation_data)
+            coordinator_name, short_alias = find_coordinator_name_and_short_alias(match['source'], federation_data)
             coordinator_msg = f"🤖 Coordinator: {coordinator_name}" if coordinator_name else ""
 
             existing_notification = cursor.execute("SELECT notification_id FROM notifications WHERE user_id = ? AND order_id = ?",
-                                              (user_id, match['id'])).fetchone()
-
+                                                   (user_id, match['id'])).fetchone()
 
             if existing_notification:
                 continue
+
+            link_base = "http://robosats6tkf3eva7x2voqso3a5wcorsnw34jveyxfqi2fu7oyheasid.onion/order/"
+            order_link = f"{link_base}{short_alias}/{match['id']}"
 
             if match['has_range']:
                 min_amt = str(match['min_amount']).rstrip('0').rstrip('.') if '.' in str(match['min_amount']) else str(match['min_amount'])
                 max_amt = str(match['max_amount']).rstrip('0').rstrip('.') if '.' in str(match['max_amount']) else str(match['max_amount'])
                 amount_display = f"{min_amt}-{max_amt}"
             else:
-                # This ensures single value amounts are also formatted to remove trailing zeros
                 amount_display = str(match['amount']).rstrip('0').rstrip('.') if '.' in str(match['amount']) else str(match['amount'])
 
             action = alert['action']
             currency_display = "Any Currency" if alert['currency'].upper() == "ANY" else alert['currency']
-            message = f"*⚡ Match found! ⚡*\n \n For you to {action}\n \n・Order ID: {match['id']},\n・Premium: {match['premium']}%,\n・Payment Method: {match['payment_method']},\n・Amount: {amount_display} {currency_display},\n \n🌍 http://{match['source']}/order/{match['id']}\n \n{coordinator_msg}"
+            message = f"*⚡ Match found! ⚡*\n\nFor you to {action}\n\n・Order ID: {match['id']},\n・Premium: {match['premium']}%,\n・Payment Method: {match['payment_method']},\n・Amount: {amount_display} {currency_display},\n\n🌍 {order_link}\n\n{coordinator_msg}"
             cursor.execute("INSERT INTO notifications (user_id, order_id, message, sent) VALUES (?, ?, ?, 0)", (user_id, match['id'], message))
-
 
         conn.commit()
 
@@ -137,13 +131,13 @@ def main(user_id, alert_json, federation_data):
         if matches:
             for match in matches:
                 match['source'] = source
-            notify_user(user_id, matches, alert, federation_data)  
+            notify_user(user_id, matches, alert, federation_data)
             print(f"Matches found and notifications saved for user ID {user_id}.")
         else:
             print("No matches found.")
 
 if __name__ == "__main__":
-    federation_data = load_federation_data()  
+    federation_data = load_federation_data()
 
     while True:
         with sqlite3.connect(DATABASE_PATH) as conn:
@@ -162,6 +156,6 @@ if __name__ == "__main__":
                 "max_amount": alert[7],
             }
 
-            main(alert[1], json.dumps(alert_dict), federation_data) 
-
-        time.sleep(120)
+            main(alert[1], json.dumps(alert_dict), federation_data)
+            print("Loop iteration complete. Waiting for one minute before the next iteration.")
+            time.sleep(60)

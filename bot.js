@@ -402,88 +402,103 @@ async function listAlerts(userId, chat, is_active) {
 }
 
 async function disableAlert(userId, alertId, chat) {
-  let db = new sqlite3.Database(DATABASE_PATH, sqlite3.OPEN_READWRITE, (err) => {
-    if (err) {
-      console.error("Error opening database", err)
-      return
-    }
-  })
-
-  db.get(`SELECT is_active FROM alerts WHERE user_id = ? AND alert_id = ?`, [userId, alertId], (err, row) => {
-    if (err) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, "Failed to query the alert status.")
-      db.close()
-    } else if (!row) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, `Alert ID ${alertId} not found.`)
-      db.close()
-    } else if (row.is_active === 0) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, `Alert ID ${alertId} is already disabled.`)
-      db.close()
-    } else {
-      db.run(`UPDATE alerts SET is_active = 0 WHERE user_id = ? AND alert_id = ?`, [userId, alertId], function (err) {
+    let db = new sqlite3.Database(DATABASE_PATH, sqlite3.OPEN_READWRITE, (err) => {
         if (err) {
-          chat.apiSendTextMessage(ChatType.Direct, userId, "⚠️ Oops! There was an error disabling the alert.")
-        } else {
-          chat.apiSendTextMessage(
-            ChatType.Direct,
-            userId,
-            `✅ Alert ID ${alertId} has been successfully disabled. You won't receive notifications for this alert until you enable it again with /enable ${alertId}. 🔕`
-          )
+            console.error("Error opening database", err);
+            return;
         }
-        db.close()
-      })
-    }
-  })
+    });
+
+    const currentTimestamp = formatDateToUTC(new Date());
+
+    db.get(`SELECT is_active FROM alerts WHERE user_id = ? AND alert_id = ?`, [userId, alertId], (err, row) => {
+        if (err) {
+            chat.apiSendTextMessage(ChatType.Direct, userId, "Failed to query the alert status.");
+            db.close();
+        } else if (!row) {
+            chat.apiSendTextMessage(ChatType.Direct, userId, `Alert ID ${alertId} not found.`);
+            db.close();
+        } else if (row.is_active === 0) {
+            chat.apiSendTextMessage(ChatType.Direct, userId, `Alert ID ${alertId} is already disabled.`);
+            db.close();
+        } else {
+            db.run(`UPDATE alerts SET is_active = 0, created_at = ? WHERE user_id = ? AND alert_id = ?`, 
+                   [currentTimestamp, userId, alertId], 
+                   function (err) {
+                if (err) {
+                    chat.apiSendTextMessage(ChatType.Direct, userId, "⚠️ Oops! There was an error disabling the alert.");
+                } else {
+                    chat.apiSendTextMessage(
+                        ChatType.Direct,
+                        userId,
+                        `✅ Alert ID ${alertId} has been successfully disabled. You won't receive notifications for this alert until you enable it again with /enable ${alertId}. 🔕`
+                    );
+                }
+                db.close();
+            });
+        }
+    });
 }
 
 async function disableAllAlerts(userId, chat) {
-  let db = new sqlite3.Database(DATABASE_PATH, sqlite3.OPEN_READWRITE, (err) => {
-    if (err) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, "Error opening database for disabling all alerts.")
-      return
-    }
-  })
-
-  db.run(`UPDATE alerts SET is_active = 0 WHERE user_id = ? AND is_active = 1`, [userId], function (err) {
-    if (err) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, "Error disabling all alerts.")
-    } else if (this.changes > 0) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, "All alerts have been disabled successfully.")
-    } else {
-      chat.apiSendTextMessage(ChatType.Direct, userId, "No enabled alerts found to disable.")
-    }
-    db.close()
-  })
-}
-async function enableAlert(userId, alertId, chat) {
-  let db = new sqlite3.Database(DATABASE_PATH, sqlite3.OPEN_READWRITE, (err) => {
-    if (err) {
-      console.error("Error opening database", err)
-      return
-    }
-  })
-
-  db.get(`SELECT is_active FROM alerts WHERE user_id = ? AND alert_id = ?`, [userId, alertId], (err, row) => {
-    if (err) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, "Failed to query the alert status.")
-      db.close()
-    } else if (!row) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, `Alert ID ${alertId} not found.`)
-      db.close()
-    } else if (row.is_active === 1) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, `Alert ID ${alertId} is already enabled.`)
-      db.close()
-    } else {
-      db.run(`UPDATE alerts SET is_active = 1 WHERE user_id = ? AND alert_id = ?`, [userId, alertId], function (err) {
+    let db = new sqlite3.Database(DATABASE_PATH, sqlite3.OPEN_READWRITE, (err) => {
         if (err) {
-          chat.apiSendTextMessage(ChatType.Direct, userId, "Error enabling the alert.")
-        } else {
-          chat.apiSendTextMessage(ChatType.Direct, userId, `Alert ID ${alertId} enabled successfully.`)
+            chat.apiSendTextMessage(ChatType.Direct, userId, "Error opening database for disabling all alerts.");
+            return;
         }
-        db.close()
-      })
-    }
-  })
+    });
+
+    const currentTimestamp = formatDateToUTC(new Date());
+
+    db.run(
+        `UPDATE alerts SET is_active = 0, created_at = ? WHERE user_id = ? AND is_active = 1`, 
+        [currentTimestamp, userId],
+        function (err) {
+            if (err) {
+                chat.apiSendTextMessage(ChatType.Direct, userId, "Error disabling all alerts.");
+            } else if (this.changes > 0) {
+                chat.apiSendTextMessage(ChatType.Direct, userId, "All alerts have been disabled successfully.");
+            } else {
+                chat.apiSendTextMessage(ChatType.Direct, userId, "No enabled alerts found to disable.");
+            }
+            db.close();
+        }
+    );
+}
+
+async function enableAlert(userId, alertId, chat) {
+    let db = new sqlite3.Database(DATABASE_PATH, sqlite3.OPEN_READWRITE, (err) => {
+        if (err) {
+            console.error("Error opening database", err);
+            return;
+        }
+    });
+
+    const currentTimestamp = formatDateToUTC(new Date());
+
+    db.get(`SELECT is_active FROM alerts WHERE user_id = ? AND alert_id = ?`, [userId, alertId], (err, row) => {
+        if (err) {
+            chat.apiSendTextMessage(ChatType.Direct, userId, "Failed to query the alert status.");
+            db.close();
+        } else if (!row) {
+            chat.apiSendTextMessage(ChatType.Direct, userId, `Alert ID ${alertId} not found.`);
+            db.close();
+        } else if (row.is_active === 1) {
+            chat.apiSendTextMessage(ChatType.Direct, userId, `Alert ID ${alertId} is already enabled.`);
+            db.close();
+        } else {
+            db.run(`UPDATE alerts SET is_active = 1, created_at = ? WHERE user_id = ? AND alert_id = ?`, 
+                   [currentTimestamp, userId, alertId], 
+                   function (err) {
+                if (err) {
+                    chat.apiSendTextMessage(ChatType.Direct, userId, "Error enabling the alert.");
+                } else {
+                    chat.apiSendTextMessage(ChatType.Direct, userId, `Alert ID ${alertId} enabled successfully.`);
+                }
+                db.close();
+            });
+        }
+    });
 }
 
 async function showHelp(userId, chat) {
@@ -514,23 +529,29 @@ async function showHelp(userId, chat) {
 }
 
 async function enableAllAlerts(userId, chat) {
-  let db = new sqlite3.Database(DATABASE_PATH, sqlite3.OPEN_READWRITE, (err) => {
-    if (err) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, "Error opening database for enabling all alerts.")
-      return
-    }
-  })
+    let db = new sqlite3.Database(DATABASE_PATH, sqlite3.OPEN_READWRITE, (err) => {
+        if (err) {
+            chat.apiSendTextMessage(ChatType.Direct, userId, "Error opening database for enabling all alerts.");
+            return;
+        }
+    });
 
-  db.run(`UPDATE alerts SET is_active = 1 WHERE user_id = ? AND is_active = 0`, [userId], function (err) {
-    if (err) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, "⚠️ Error enabling all alerts.")
-    } else if (this.changes > 0) {
-      chat.apiSendTextMessage(ChatType.Direct, userId, "✅ All alerts have been enabled successfully.")
-    } else {
-      chat.apiSendTextMessage(ChatType.Direct, userId, "⚠️ No disabled alerts found to enable.")
-    }
-    db.close()
-  })
+    const currentTimestamp = formatDateToUTC(new Date());
+
+    db.run(
+        `UPDATE alerts SET is_active = 1, created_at = ? WHERE user_id = ? AND is_active = 0`, 
+        [currentTimestamp, userId],
+        function (err) {
+            if (err) {
+                chat.apiSendTextMessage(ChatType.Direct, userId, "⚠️ Error enabling all alerts.");
+            } else if (this.changes > 0) {
+                chat.apiSendTextMessage(ChatType.Direct, userId, "✅ All alerts have been enabled successfully.");
+            } else {
+                chat.apiSendTextMessage(ChatType.Direct, userId, "⚠️ No disabled alerts found to enable.");
+            }
+            db.close();
+        }
+    );
 }
 
 async function completeAlertCreation(userId, session, chat) {

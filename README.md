@@ -95,6 +95,8 @@ Here's a brief overview of the key components in this project:
 
 - **`orderbook_downloader.py`**: Responsible for downloading the latest orderbooks data from Robosats coordinators. It saves this data locally to be processed by `matcher.py` for matching against user alerts.
 
+- **`cleanup.py`**: A cleanup script to be run with crontab, that cleans database from old entries that are not anymore relevant.
+
 ### Data Files
 
 - **`data/alert.db`**: A SQLite database file that stores user alerts, matches, and notifications status.
@@ -157,7 +159,17 @@ python3 matcher.py
 python3 orderbook_downloader.py
 ```
 
-For the bot to function properly, the SimpleX Chat terminal CLI, bot.js, matcher.py, and orderbook_downloader.py must run simultaneously.
+For the bot to function, the SimpleX Chat terminal CLI, bot.js, matcher.py, and orderbook_downloader.py must run simultaneously.
+An optional way to run them simultaneously, is to setup tmux to start them with 4 split windows. 
+This allows for the scripts to run in background and to have a glance of the 4 processes at the same time.
+
+Lastly, create a crontab entry for the cleanup script (this script delete disabled alerts older than 14 days and notifications older than 7 days from your SQLite database):
+
+```bash
+crontab -e
+0 3 * * * /usr/bin/python3 /path/to/cleanup.py
+```
+
 
 ## Easter egg
 
